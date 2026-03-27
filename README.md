@@ -1,3 +1,13 @@
+---
+title: Smart Support Env
+emoji: "\U0001F6A8"
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Smart Support Env
 
 `smart-support-env` is a realistic OpenEnv-style benchmark for customer support agents. Instead of a toy chatbot, it simulates three real workflows that support teams handle every day:
