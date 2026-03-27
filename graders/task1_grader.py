@@ -1,4 +1,7 @@
-from models.state import EnvironmentState, TicketStatus
+try:
+    from ..models.state import EnvironmentState, TicketStatus
+except ImportError:
+    from models.state import EnvironmentState, TicketStatus
 
 
 def grade_basic_greeting(state: EnvironmentState) -> float:

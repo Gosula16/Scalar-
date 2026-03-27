@@ -1,4 +1,7 @@
-from models.state import EnvironmentState, TicketStatus
+try:
+    from ..models.state import EnvironmentState, TicketStatus
+except ImportError:
+    from models.state import EnvironmentState, TicketStatus
 
 
 def grade_advanced_escalation(state: EnvironmentState) -> float:

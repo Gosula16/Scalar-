@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
+ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")
 API_BASE_URL = os.getenv("API_BASE_URL")
 MODEL_NAME = os.getenv("MODEL_NAME")
 HF_TOKEN = os.getenv("HF_TOKEN")
@@ -167,12 +167,13 @@ def run_task(task_name: str, client: OpenAI | None) -> Dict:
         observation = step_result["observation"]
         reward = step_result["reward"]
         finished = step_result["done"]
+        grader_score = observation.get("grader_score", 0.0)
         steps.append(
             {
                 "step": observation["step_count"],
                 "action_type": action["action_type"],
-                "reward": reward["value"],
-                "grader_score": reward["grader_score"],
+                "reward": reward,
+                "grader_score": grader_score,
                 "status": observation["status"],
             }
         )

@@ -1,6 +1,9 @@
 from typing import Dict, List
 
-from models.state import CustomerTicket
+try:
+    from ..models.state import CustomerTicket
+except ImportError:
+    from models.state import CustomerTicket
 
 
 TASKS: Dict[str, Dict] = {

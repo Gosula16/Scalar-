@@ -4,13 +4,15 @@ emoji: "\U0001F6A8"
 colorFrom: blue
 colorTo: green
 sdk: docker
-app_port: 7860
+app_port: 8000
 pinned: false
+tags:
+  - openenv
 ---
 
 # Smart Support Env
 
-`smart-support-env` is a realistic OpenEnv-style benchmark for customer support agents. Instead of a toy chatbot, it simulates three real workflows that support teams handle every day:
+`smart-support-env` is a realistic OpenEnv benchmark for customer support agents. Instead of a toy chatbot, it simulates three real workflows that support teams handle every day:
 
 1. `basic_greeting` (easy): onboard a new user and guide them to CSV import.
 2. `medium_resolution` (medium): recover access during a password reset failure.
@@ -28,7 +30,7 @@ This benchmark is designed for evaluating agents that must:
 - escalate only when policy requires it,
 - finish the ticket within a limited step budget.
 
-## API surface
+## OpenEnv surface
 
 The server exposes the standard interaction pattern:
 
@@ -132,15 +134,15 @@ uv run server
 Or, if you are not using `uv`:
 
 ```bash
-uvicorn app:app --host 0.0.0.0 --port 7860
+uvicorn server.app:app --host 0.0.0.0 --port 8000
 ```
 
 Example calls:
 
 ```bash
-curl http://localhost:7860/tasks
-curl -X POST http://localhost:7860/reset -H "Content-Type: application/json" -d "{\"task_name\":\"basic_greeting\"}"
-curl http://localhost:7860/state
+curl http://localhost:8000/tasks
+curl -X POST http://localhost:8000/reset -H "Content-Type: application/json" -d "{\"task_name\":\"basic_greeting\"}"
+curl http://localhost:8000/state
 ```
 
 ## Baseline inference
@@ -179,7 +181,7 @@ Build locally:
 
 ```bash
 docker build -t smart-support-env .
-docker run -p 7860:7860 smart-support-env
+docker run -p 8000:8000 smart-support-env
 ```
 
 For Hugging Face Spaces:
@@ -188,18 +190,19 @@ For Hugging Face Spaces:
 2. Push this repository.
 3. Set `API_BASE_URL`, `MODEL_NAME`, and `HF_TOKEN` as Space secrets if you want the LLM baseline to run there.
 
-The container serves the app on port `7860`.
+The container serves the app on port `8000`.
 
 ## Project structure
 
 ```text
 smart-support-env/
-  app.py
+  client.py
+  support_models.py
   openenv.yaml
   inference.py
   Dockerfile
   requirements.txt
-  models/
+  server/
   tasks/
   graders/
 ```
