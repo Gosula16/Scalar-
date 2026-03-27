@@ -36,7 +36,7 @@ The environment exposes:
 7. Local Run
 - create a virtual environment
 - install requirements
-- start the API with uvicorn
+- start the API with uv run server or uvicorn on port 8000
 - call /reset and /step or run inference.py
 
 8. Baseline
@@ -45,7 +45,12 @@ If model variables are configured, it uses the OpenAI client.
 If not, it falls back to a deterministic heuristic baseline for smoke testing.
 
 9. Deployment
-The included Dockerfile serves the app on port 7860 for Hugging Face Spaces.
+The included Dockerfile serves the app on port 8000 for Hugging Face Spaces.
+
+11. Live Links
+- GitHub: https://github.com/Gosula16/Scalar-
+- Hugging Face Space: https://huggingface.co/spaces/Gosula16/smart-support-env
+- Hosted app: https://gosula16-smart-support-env.hf.space
 
 10. Submission Checklist
 - verify all endpoints work

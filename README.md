@@ -20,6 +20,12 @@ tags:
 
 The environment is deterministic, multi-step, and reward-shaped so agents get partial credit for doing the right work in the right order.
 
+## Live Links
+
+- GitHub repository: [https://github.com/Gosula16/Scalar-](https://github.com/Gosula16/Scalar-)
+- Hugging Face Space: [https://huggingface.co/spaces/Gosula16/smart-support-env](https://huggingface.co/spaces/Gosula16/smart-support-env)
+- Hosted app URL: [https://gosula16-smart-support-env.hf.space](https://gosula16-smart-support-env.hf.space)
+
 ## Why this is useful
 
 This benchmark is designed for evaluating agents that must:
