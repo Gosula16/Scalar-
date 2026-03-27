@@ -208,6 +208,16 @@ async def health() -> Dict[str, str]:
     return {"status": "healthy"}
 
 
+@app.get("/")
+async def root() -> Dict:
+    return {
+        "name": "smart-support-env",
+        "status": "ready",
+        "description": "Real-world customer support environment with three graded tasks.",
+        "endpoints": ["/reset", "/step", "/state", "/tasks", "/health", "/docs"],
+    }
+
+
 @app.get("/tasks")
 async def list_tasks() -> List[Dict[str, str]]:
     return [
@@ -232,6 +242,8 @@ async def reset(request: ResetRequest) -> Dict:
     last_action_signature = ""
     return {
         "observation": _to_observation(env_state).model_dump(),
+        "reward": None,
+        "done": False,
         "task": {
             "task_name": request.task_name,
             "difficulty": ACTIVE_TASK["difficulty"],
@@ -261,4 +273,4 @@ async def get_state() -> Dict:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=7860)

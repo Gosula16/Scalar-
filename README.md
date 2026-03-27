@@ -126,6 +126,12 @@ pip install -r requirements.txt
 Run the API:
 
 ```bash
+uv run server
+```
+
+Or, if you are not using `uv`:
+
+```bash
 uvicorn app:app --host 0.0.0.0 --port 7860
 ```
 
