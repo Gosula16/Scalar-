@@ -1,0 +1,55 @@
+Smart Support Env - Step-by-Step Project Guide
+
+1. Purpose
+Build a real-world OpenEnv-style environment for customer support workflows.
+
+2. Domain
+The application simulates three real support tasks:
+- new user onboarding
+- password reset recovery
+- duplicate billing escalation
+
+3. Core API
+The environment exposes:
+- POST /reset
+- POST /step
+- GET /state
+- GET /tasks
+- GET /health
+
+4. Typed Models
+- Action model: support action, content, confidence, optional resolution code
+- Observation model: ticket, conversation, status, remaining steps
+- Reward model: reward value, progress, penalty, explanation, grader score
+- State model: full environment state with objective tracking
+
+5. Tasks
+- basic_greeting: easy
+- medium_resolution: medium
+- advanced_escalation: hard
+
+6. Rewards
+- positive reward for completing the correct next objective
+- penalties for missing details, repeating actions, or unsafe handling
+- continuous grader score between 0.0 and 1.0
+
+7. Local Run
+- create a virtual environment
+- install requirements
+- start the API with uvicorn
+- call /reset and /step or run inference.py
+
+8. Baseline
+inference.py runs against the local environment.
+If model variables are configured, it uses the OpenAI client.
+If not, it falls back to a deterministic heuristic baseline for smoke testing.
+
+9. Deployment
+The included Dockerfile serves the app on port 7860 for Hugging Face Spaces.
+
+10. Submission Checklist
+- verify all endpoints work
+- confirm all three tasks run
+- confirm graders stay in the 0.0 to 1.0 range
+- run the baseline
+- deploy the Docker app to HF Spaces
