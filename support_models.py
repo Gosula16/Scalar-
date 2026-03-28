@@ -1,10 +1,23 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-try:
-    from openenv.core.env_server.types import Action, Observation, State
-except ImportError:
-    from openenv_core.env_server.types import Action, Observation, State
+
+@dataclass(kw_only=True)
+class Action:
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(kw_only=True)
+class Observation:
+    done: bool = False
+    reward: float | None = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class State:
+    episode_id: str = ""
+    step_count: int = 0
 
 
 @dataclass(kw_only=True)
