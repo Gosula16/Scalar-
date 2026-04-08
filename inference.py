@@ -3,22 +3,51 @@
 
 import json
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import requests
-from openai import OpenAI
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
 
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")
-API_BASE_URL = os.getenv("API_BASE_URL")
-MODEL_NAME = os.getenv("MODEL_NAME")
-HF_TOKEN = os.getenv("HF_TOKEN")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+BENCHMARK = os.getenv("SMART_SUPPORT_BENCHMARK", "smart_support_env")
+MAX_STEPS = 8
+TEMPERATURE = 0.0
+MAX_TOKENS = 250
+SUCCESS_SCORE_THRESHOLD = 0.6
 
 
-def emit(tag: str, payload: Dict) -> None:
-    print(f"[{tag}] {json.dumps(payload, separators=(',', ':'), sort_keys=False)}")
+def log_start(task: str, env: str, model: str) -> None:
+    print(f"[START] task={task} env={env} model={model}", flush=True)
+
+
+def log_step(
+    step: int,
+    action: str,
+    reward: float,
+    done: bool,
+    error: Optional[str],
+) -> None:
+    error_value = error if error else "null"
+    print(
+        f"[STEP] step={step} action={action} reward={reward:.2f} "
+        f"done={str(done).lower()} error={error_value}",
+        flush=True,
+    )
+
+
+def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+    rewards_str = ",".join(f"{reward:.2f}" for reward in rewards)
+    print(
+        f"[END] success={str(success).lower()} steps={steps} "
+        f"score={score:.3f} rewards={rewards_str}",
+        flush=True,
+    )
 
 
 def build_prompt(observation: Dict) -> str:
@@ -71,15 +100,15 @@ def heuristic_action(task_name: str, step_count: int) -> Dict:
             {
                 "action_type": "close_ticket",
                 "content": "If the import template helps, you can use it now, and support is here if you need anything else.",
-                "confidence": 0.9,
+                "confidence": 0.90,
                 "resolution_code": None,
             },
         ],
         "medium_resolution": [
             {
                 "action_type": "empathize",
-                "content": "I understand the time pressure before your demo, and I'll help you get access back quickly.",
-                "confidence": 0.9,
+                "content": "I understand the time pressure before your demo, and I will help you get access back quickly.",
+                "confidence": 0.90,
                 "resolution_code": None,
             },
             {
@@ -111,7 +140,7 @@ def heuristic_action(task_name: str, step_count: int) -> Dict:
             {
                 "action_type": "ask_clarifying_question",
                 "content": "Please send the invoice IDs and the timestamp for each charge so billing can verify the duplicate transaction.",
-                "confidence": 0.9,
+                "confidence": 0.90,
                 "resolution_code": None,
             },
             {
@@ -138,14 +167,15 @@ def heuristic_action(task_name: str, step_count: int) -> Dict:
     return task_plan[min(step_count, len(task_plan) - 1)]
 
 
-def llm_action(client: OpenAI, observation: Dict) -> Dict:
-    response = client.chat.completions.create(
+def get_model_action(client: OpenAI, observation: Dict) -> Dict:
+    completion = client.chat.completions.create(
         model=MODEL_NAME,
-        temperature=0,
         messages=[{"role": "user", "content": build_prompt(observation)}],
+        temperature=TEMPERATURE,
+        max_tokens=MAX_TOKENS,
     )
-    raw_content = response.choices[0].message.content or "{}"
-    return json.loads(raw_content)
+    raw_content = (completion.choices[0].message.content or "").strip()
+    return json.loads(raw_content or "{}")
 
 
 def post_json(path: str, payload: Dict) -> Dict:
@@ -154,97 +184,64 @@ def post_json(path: str, payload: Dict) -> Dict:
     return response.json()
 
 
-def run_task(task_name: str, client: OpenAI | None) -> Dict:
-    reset_payload = {"task_name": task_name}
-    reset_result = post_json("/reset", reset_payload)
-    observation = reset_result["observation"]
-    finished = False
-    steps = []
-
-    emit(
-        "START",
-        {
-            "task_name": task_name,
-            "task_title": observation.get("task_title"),
-            "task_difficulty": observation.get("task_difficulty"),
-            "model_name": MODEL_NAME if client is not None else "heuristic-baseline",
-        },
-    )
-
-    while not finished:
-        if client is None:
-            action = heuristic_action(task_name, observation["step_count"])
-        else:
-            action = llm_action(client, observation)
-
-        step_result = post_json("/step", {"action": action})
-        observation = step_result["observation"]
-        reward = step_result["reward"]
-        finished = step_result["done"]
-        grader_score = observation.get("grader_score", 0.0)
-        steps.append(
-            {
-                "step": observation["step_count"],
-                "action_type": action["action_type"],
-                "reward": reward,
-                "grader_score": grader_score,
-                "status": observation["status"],
-            }
-        )
-        emit(
-            "STEP",
-            {
-                "task_name": task_name,
-                "step": observation["step_count"],
-                "action_type": action["action_type"],
-                "reward": reward,
-                "grader_score": grader_score,
-                "status": observation["status"],
-                "done": finished,
-            },
-        )
-
-    result = {
-        "task_name": task_name,
-        "final_status": observation["status"],
-        "total_steps": observation["step_count"],
-        "final_grader_score": steps[-1]["grader_score"] if steps else 0.0,
-        "trajectory": steps,
-    }
-    emit(
-        "END",
-        {
-            "task_name": task_name,
-            "final_status": result["final_status"],
-            "total_steps": result["total_steps"],
-            "final_grader_score": result["final_grader_score"],
-        },
-    )
-    return result
+def format_action(action: Dict) -> str:
+    return action.get("action_type", "unknown")
 
 
-def make_client() -> OpenAI | None:
-    if API_BASE_URL and MODEL_NAME and HF_TOKEN:
-        return OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
-    return None
+def run_task(task_name: str, client: Optional[OpenAI]) -> None:
+    rewards: List[float] = []
+    steps_taken = 0
+    score = 0.0
+    success = False
+
+    log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME if client else "heuristic-baseline")
+
+    try:
+        reset_result = post_json("/reset", {"task_name": task_name})
+        observation = reset_result["observation"]
+        done = bool(reset_result.get("done", False))
+
+        for step in range(1, MAX_STEPS + 1):
+            if done:
+                break
+
+            action = heuristic_action(task_name, observation["step_count"]) if client is None else get_model_action(client, observation)
+
+            step_result = post_json("/step", {"action": action})
+            observation = step_result["observation"]
+            reward = float(step_result.get("reward") or 0.0)
+            done = bool(step_result.get("done", False))
+            error = observation.get("metadata", {}).get("last_action_error")
+
+            rewards.append(reward)
+            steps_taken = step
+
+            log_step(
+                step=step,
+                action=format_action(action),
+                reward=reward,
+                done=done,
+                error=error,
+            )
+
+            if done:
+                break
+
+        score = float(observation.get("grader_score", 0.0))
+        score = min(max(score, 0.0), 1.0)
+        success = score >= SUCCESS_SCORE_THRESHOLD
+
+    finally:
+        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
 
 def main() -> None:
-    client = make_client()
-    task_names = ["basic_greeting", "medium_resolution", "advanced_escalation"]
-    results = [run_task(task_name, client) for task_name in task_names]
+    client: Optional[OpenAI] = None
+    if HF_TOKEN:
+        client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
 
-    average = sum(result["final_grader_score"] for result in results) / len(results)
-    emit(
-        "END",
-        {
-            "summary": True,
-            "task_count": len(results),
-            "average_score": average,
-            "mode": "llm" if client is not None else "heuristic",
-            "model_name": MODEL_NAME if client is not None else "heuristic-baseline",
-        },
-    )
+    for task_name in ["basic_greeting", "medium_resolution", "advanced_escalation"]:
+        run_task(task_name, client)
 
 
 if __name__ == "__main__":
