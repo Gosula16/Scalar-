@@ -1,7 +1,9 @@
 try:
     from ..models.state import EnvironmentState, TicketStatus
+    from .common import strict_unit_interval
 except ImportError:
     from models.state import EnvironmentState, TicketStatus
+    from graders.common import strict_unit_interval
 
 
 def grade_basic_greeting(state: EnvironmentState) -> float:
@@ -10,4 +12,4 @@ def grade_basic_greeting(state: EnvironmentState) -> float:
     if state.status in {TicketStatus.RESOLVED, TicketStatus.CLOSED}:
         score += 0.1
     score -= min(state.repeated_action_count * 0.05, 0.1)
-    return max(0.0, min(score, 1.0))
+    return strict_unit_interval(score)

@@ -20,6 +20,7 @@ MAX_STEPS = 8
 TEMPERATURE = 0.0
 MAX_TOKENS = 250
 SUCCESS_SCORE_THRESHOLD = 0.6
+EPSILON = 0.001
 
 
 def log_start(task: str, env: str, model: str) -> None:
@@ -188,6 +189,10 @@ def format_action(action: Dict) -> str:
     return action.get("action_type", "unknown")
 
 
+def strict_unit_interval(score: float) -> float:
+    return min(max(score, EPSILON), 1.0 - EPSILON)
+
+
 def run_task(task_name: str, client: Optional[OpenAI]) -> None:
     rewards: List[float] = []
     steps_taken = 0
@@ -252,13 +257,13 @@ def run_task(task_name: str, client: Optional[OpenAI]) -> None:
             score = float(observation.get("grader_score", 0.0))
         except Exception:
             score = 0.0
-        score = min(max(score, 0.0), 1.0)
+        score = strict_unit_interval(score)
         success = score >= SUCCESS_SCORE_THRESHOLD
 
     except Exception:
         success = False
         steps_taken = steps_taken or 0
-        score = 0.0
+        score = strict_unit_interval(0.0)
 
     finally:
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
@@ -277,7 +282,7 @@ def main() -> None:
             run_task(task_name, client)
         except Exception:
             log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME if client else "heuristic-baseline")
-            log_end(success=False, steps=0, score=0.0, rewards=[])
+            log_end(success=False, steps=0, score=strict_unit_interval(0.0), rewards=[])
 
 
 if __name__ == "__main__":

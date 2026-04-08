@@ -1,7 +1,9 @@
 try:
     from ..models.state import EnvironmentState, TicketStatus
+    from .common import strict_unit_interval
 except ImportError:
     from models.state import EnvironmentState, TicketStatus
+    from graders.common import strict_unit_interval
 
 
 def grade_medium_resolution(state: EnvironmentState) -> float:
@@ -11,4 +13,4 @@ def grade_medium_resolution(state: EnvironmentState) -> float:
         score += 0.1
     if state.unsafe_action_count:
         score -= 0.1 * state.unsafe_action_count
-    return max(0.0, min(score, 1.0))
+    return strict_unit_interval(score)
