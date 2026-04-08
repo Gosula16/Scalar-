@@ -17,6 +17,10 @@ MODEL_NAME = os.getenv("MODEL_NAME")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 
+def emit(tag: str, payload: Dict) -> None:
+    print(f"[{tag}] {json.dumps(payload, separators=(',', ':'), sort_keys=False)}")
+
+
 def build_prompt(observation: Dict) -> str:
     ticket = observation["current_ticket"]
     history_lines = [
@@ -157,6 +161,16 @@ def run_task(task_name: str, client: OpenAI | None) -> Dict:
     finished = False
     steps = []
 
+    emit(
+        "START",
+        {
+            "task_name": task_name,
+            "task_title": observation.get("task_title"),
+            "task_difficulty": observation.get("task_difficulty"),
+            "model_name": MODEL_NAME if client is not None else "heuristic-baseline",
+        },
+    )
+
     while not finished:
         if client is None:
             action = heuristic_action(task_name, observation["step_count"])
@@ -177,14 +191,36 @@ def run_task(task_name: str, client: OpenAI | None) -> Dict:
                 "status": observation["status"],
             }
         )
+        emit(
+            "STEP",
+            {
+                "task_name": task_name,
+                "step": observation["step_count"],
+                "action_type": action["action_type"],
+                "reward": reward,
+                "grader_score": grader_score,
+                "status": observation["status"],
+                "done": finished,
+            },
+        )
 
-    return {
+    result = {
         "task_name": task_name,
         "final_status": observation["status"],
         "total_steps": observation["step_count"],
         "final_grader_score": steps[-1]["grader_score"] if steps else 0.0,
         "trajectory": steps,
     }
+    emit(
+        "END",
+        {
+            "task_name": task_name,
+            "final_status": result["final_status"],
+            "total_steps": result["total_steps"],
+            "final_grader_score": result["final_grader_score"],
+        },
+    )
+    return result
 
 
 def make_client() -> OpenAI | None:
@@ -195,21 +231,20 @@ def make_client() -> OpenAI | None:
 
 def main() -> None:
     client = make_client()
-    if client is None:
-        print("Running heuristic baseline because API_BASE_URL, MODEL_NAME, or HF_TOKEN is not set.")
-    else:
-        print(f"Running LLM baseline against {MODEL_NAME}.")
-
     task_names = ["basic_greeting", "medium_resolution", "advanced_escalation"]
     results = [run_task(task_name, client) for task_name in task_names]
 
     average = sum(result["final_grader_score"] for result in results) / len(results)
-    for result in results:
-        print(
-            f"{result['task_name']}: score={result['final_grader_score']:.3f} "
-            f"status={result['final_status']} steps={result['total_steps']}"
-        )
-    print(f"average_score={average:.3f}")
+    emit(
+        "END",
+        {
+            "summary": True,
+            "task_count": len(results),
+            "average_score": average,
+            "mode": "llm" if client is not None else "heuristic",
+            "model_name": MODEL_NAME if client is not None else "heuristic-baseline",
+        },
+    )
 
 
 if __name__ == "__main__":
