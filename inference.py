@@ -198,20 +198,41 @@ def run_task(task_name: str, client: Optional[OpenAI]) -> None:
 
     try:
         reset_result = post_json("/reset", {"task_name": task_name})
-        observation = reset_result["observation"]
+        observation = reset_result.get("observation", {}) or {}
         done = bool(reset_result.get("done", False))
+        last_error: Optional[str] = None
 
         for step in range(1, MAX_STEPS + 1):
             if done:
                 break
 
-            action = heuristic_action(task_name, observation["step_count"]) if client is None else get_model_action(client, observation)
+            try:
+                step_count = int(observation.get("step_count", step - 1))
+            except Exception:
+                step_count = step - 1
 
-            step_result = post_json("/step", {"action": action})
-            observation = step_result["observation"]
-            reward = float(step_result.get("reward") or 0.0)
-            done = bool(step_result.get("done", False))
-            error = observation.get("metadata", {}).get("last_action_error")
+            try:
+                action = (
+                    heuristic_action(task_name, step_count)
+                    if client is None
+                    else get_model_action(client, observation)
+                )
+            except Exception as exc:
+                action = {"action_type": "resolve", "content": "Fallback support action.", "confidence": 0.0}
+                last_error = str(exc)
+                log_step(step=step, action=format_action(action), reward=0.0, done=True, error=last_error)
+                break
+
+            try:
+                step_result = post_json("/step", {"action": action})
+                observation = step_result.get("observation", {}) or {}
+                reward = float(step_result.get("reward") or 0.0)
+                done = bool(step_result.get("done", False))
+                error = observation.get("metadata", {}).get("last_action_error") or last_error
+            except Exception as exc:
+                reward = 0.0
+                done = True
+                error = str(exc)
 
             rewards.append(reward)
             steps_taken = step
@@ -227,9 +248,17 @@ def run_task(task_name: str, client: Optional[OpenAI]) -> None:
             if done:
                 break
 
-        score = float(observation.get("grader_score", 0.0))
+        try:
+            score = float(observation.get("grader_score", 0.0))
+        except Exception:
+            score = 0.0
         score = min(max(score, 0.0), 1.0)
         success = score >= SUCCESS_SCORE_THRESHOLD
+
+    except Exception:
+        success = False
+        steps_taken = steps_taken or 0
+        score = 0.0
 
     finally:
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
@@ -237,11 +266,18 @@ def run_task(task_name: str, client: Optional[OpenAI]) -> None:
 
 def main() -> None:
     client: Optional[OpenAI] = None
-    if HF_TOKEN:
-        client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+    try:
+        if HF_TOKEN:
+            client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+    except Exception:
+        client = None
 
     for task_name in ["basic_greeting", "medium_resolution", "advanced_escalation"]:
-        run_task(task_name, client)
+        try:
+            run_task(task_name, client)
+        except Exception:
+            log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME if client else "heuristic-baseline")
+            log_end(success=False, steps=0, score=0.0, rewards=[])
 
 
 if __name__ == "__main__":
